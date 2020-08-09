@@ -216,6 +216,7 @@ static window_node *list_head = NULL;
 
 
 static window_node *graph_win_and_tex;
+static window_node *newgraph_win_and_tex;
 static window_node *freq_win_and_tex;
 static window_node *logfreq_win_and_tex;
 
@@ -228,6 +229,7 @@ static void graph_wave(window_node *window);
 static double midi_to_hz(double midi);
 static double hz_to_midi(double Hz);
 static void display_stuff(window_node *win_node, unsigned *data, unsigned row_index, unsigned key_height);
+static void display_newgraph(window_node *win_node, sample_type *data, unsigned databytes/*, unsigned row_index*/);
 
 
 static window_node *add_window_node(void (*destroy)(struct window_node *is), void (*expose)(struct window_node *is)){
@@ -441,6 +443,7 @@ static void dealwith_userevent(SDL_UserEvent *event){
 
 	display_stuff(freq_win_and_tex, &freq_data[0][0], freq_current%Q_HEIGHT, freq_key_image_height/*FREQ_KEYS_HEIGHT*/);
 	display_stuff(logfreq_win_and_tex, &logfreq_data[0][0], logfreq_current%Q_HEIGHT, logfreq_key_image_height/*LOGFREQ_KEYS_HEIGHT*/);
+	display_newgraph(newgraph_win_and_tex, event->data1, bytes_given);
 }
 
 
@@ -493,8 +496,8 @@ static void display_stuff(window_node *win_node, unsigned *data, unsigned row_in
 		memcpy(tex_pixels, data + rts * win_node->width, tex_pitch*rtl);
 		SDL_UnlockTexture(win_node->tex_extra);
 	}
-	SDL_Rect recent_texrect = (SDL_Rect){.x=0, .y=ets, .w = win_node->width, .h = etl};
-	SDL_LockTexture(win_node->tex_extra, &recent_texrect, &tex_pixels, &tex_pitch);
+	SDL_Rect earlier_texrect = (SDL_Rect){.x=0, .y=ets, .w = win_node->width, .h = etl};
+	SDL_LockTexture(win_node->tex_extra, &earlier_texrect, &tex_pixels, &tex_pitch);
 	memcpy(tex_pixels, data + ets * win_node->width, tex_pitch*etl);
 	SDL_UnlockTexture(win_node->tex_extra);
 	
@@ -508,6 +511,61 @@ static void display_stuff(window_node *win_node, unsigned *data, unsigned row_in
 	SDL_RenderCopy(win_node->rend, win_node->tex_extra, &earlier_srcrect, &earlier_dstrect);
 
 	SDL_RenderPresent(win_node->rend);
+}
+
+
+static unsigned audio_chunks_drawn = 0;
+static void display_newgraph(window_node *win_node, sample_type *data, unsigned databytes/*, unsigned row_index*/){
+	if (!win_node) //check if window is closed
+		return;
+	
+	if (!win_node->tex_extra){
+		win_node->tex_extra = SDL_CreateTexture(
+			win_node->rend,
+			SDL_PIXELFORMAT_ARGB8888,
+			//SDL_TEXTUREACCESS_STATIC, //to use CPU
+			SDL_TEXTUREACCESS_STREAMING, //to use GPU
+			win_node->width,
+			Q_HEIGHT
+		);
+	}
+
+	int tex_pitch;
+	void *tex_pixels;
+
+
+
+/**/
+	const unsigned pitch = win_node->width * sizeof (unsigned);
+	unsigned *to_put_in_window = calloc(pitch, win_node->height);
+
+	int i = 0;
+	do{
+		int j = 0;
+		do{
+			double s = data[i*4+j];
+			unsigned y = win_node->height - ((s - SAMPLE_MIN) * (double)(win_node->height-1) / (SAMPLE_MAX - SAMPLE_MIN)) - 1;
+			to_put_in_window[y * win_node->width + i] = 0xffffff;
+		} while (++j < 4);
+	} while (++i < 512/4);
+/**/
+
+
+
+	SDL_Rect recent_texrect = (SDL_Rect){.x=0, .y=0, .w = win_node->width, .h = win_node->height};
+	SDL_LockTexture(win_node->tex_extra, &recent_texrect, &tex_pixels, &tex_pitch);
+	//memcpy(tex_pixels, data * win_node->width, databytes);
+	memcpy(tex_pixels, to_put_in_window, pitch * win_node->height);
+	SDL_UnlockTexture(win_node->tex_extra);
+	
+
+	SDL_Rect recent_srcrect = (SDL_Rect){.x = 0,.y = 0,.w = 512/4,.h = win_node->height};
+	SDL_Rect recent_dstrect = (SDL_Rect){.x = 128 * audio_chunks_drawn,.y = 0,.w = 512/4,.h = win_node->height};
+	SDL_RenderCopy(win_node->rend, win_node->tex_extra, &recent_srcrect, &recent_dstrect);
+
+	SDL_RenderPresent(win_node->rend);
+	free(to_put_in_window);
+	audio_chunks_drawn++;
 }
 
 
@@ -582,11 +640,13 @@ static void handle_event(SDL_Event *event){
 		}
 		break;
 	case SDL_KEYDOWN:
+		audio_chunks_drawn = 0; //since there will be new audio that is not draw
 		keyboard_down(&event->key);
 		if(graph_win_and_tex)// If NULL graph window has been closed and thus can not be updated (this if is nolonger needed)
 			graph_wave(graph_win_and_tex);
 		break;
 	case SDL_KEYUP:
+		audio_chunks_drawn = 0; //since there will be new audio that is not draw
 		key_up(event->key.keysym.scancode);
 		break;
 	case SDL_QUIT:
@@ -789,6 +849,12 @@ static void graph_win_and_tex_destroy(window_node *node){
 	graph_win_and_tex = NULL;
 }
 
+static void newgraph_win_and_tex_destroy(window_node *node){
+	SDL_DestroyTexture(node->tex);
+	SDL_DestroyTexture(node->tex_extra);
+	newgraph_win_and_tex = NULL;
+}
+
 static void freq_win_and_tex_destroy(window_node *node){
 	SDL_DestroyTexture(node->tex);
 	SDL_DestroyTexture(node->tex_extra);
@@ -808,6 +874,12 @@ static void dummy_destroy(window_node *node){
 //Exposed functions for windows
 static void graph_win_and_tex_expose(window_node *node){
 	graph_wave(node);
+}
+
+static void newgraph_win_and_tex_expose(window_node *node){
+	SDL_SetRenderDrawColor(node->rend,  155,80,80,  255);
+	SDL_RenderClear(node->rend);
+	SDL_RenderPresent(node->rend);
 }
 
 static void freq_win_and_tex_expose(window_node *node){
@@ -1004,6 +1076,7 @@ int main(int argc, char *argv[]) {
 
 //	Window
 	graph_win_and_tex = spec_and_mk_win_and_tex(add_window_node(&graph_win_and_tex_destroy, &graph_win_and_tex_expose), "graph", MAX_SAMPLES/3, 150, SDL_PIXELFORMAT_ARGB8888);
+	newgraph_win_and_tex = spec_and_mk_win_and_tex(add_window_node(&newgraph_win_and_tex_destroy, &newgraph_win_and_tex_expose), "new graph", 1900, 150, SDL_PIXELFORMAT_ARGB8888);
 	freq_win_and_tex = spec_and_mk_win_and_tex(add_window_node(&freq_win_and_tex_destroy, &freq_win_and_tex_expose), "freq", FREQ_WIDTH, LOGFREQ_HEIGHT, SDL_PIXELFORMAT_ARGB8888);
 	logfreq_win_and_tex = spec_and_mk_win_and_tex(add_window_node(&logfreq_win_and_tex_destroy, &logfreq_win_and_tex_expose), "logfreq", LOGFREQ_WIDTH, LOGFREQ_HEIGHT, SDL_PIXELFORMAT_ARGB8888);
 
