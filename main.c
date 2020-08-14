@@ -168,6 +168,8 @@ static int key_to_midi(int key){
 	return m;
 }
 
+
+static unsigned audio_chunks_drawn = 0; //maybe should not be here
 static unsigned keybits[4];
 
 static void key_up(int key){
@@ -179,6 +181,8 @@ static void key_up(int key){
 	const unsigned bit_index   = 0x1f & m;
 	const unsigned array_index = m >> 5;
 	keybits[array_index] &= ~(1u << bit_index);
+
+	audio_chunks_drawn = 0;
 }
 
 static void key_down(int key){
@@ -189,7 +193,12 @@ static void key_down(int key){
 
 	const unsigned bit_index   = 0x1f & m;
 	const unsigned array_index = m >> 5;
-	keybits[array_index] |= (1u << bit_index);
+
+	//check if bit is already set
+	if (!(keybits[array_index] & (1u << bit_index))){
+		audio_chunks_drawn = 0;
+		keybits[array_index] |= (1u << bit_index);
+	}
 }
 
 static int is_midi_playing(int m){
@@ -229,7 +238,7 @@ static void graph_wave(window_node *window);
 static double midi_to_hz(double midi);
 static double hz_to_midi(double Hz);
 static void display_stuff(window_node *win_node, unsigned *data, unsigned row_index, unsigned key_height);
-static void display_newgraph(window_node *win_node, sample_type *data, unsigned databytes/*, unsigned row_index*/);
+static void display_newgraph(window_node *win_node, sample_type *data);
 
 
 static window_node *add_window_node(void (*destroy)(struct window_node *is), void (*expose)(struct window_node *is)){
@@ -324,7 +333,6 @@ static double dsp_window(double x){
 static void compute_spectrum(double *restrict const dst, const sample_type *restrict const src, unsigned n, fftw_plan plan, double *restrict const max_mag){
 	unsigned i = 0;
 	do{
-		// copy from audio_for_fft for fft, scaling to -1.0 to 1.0 range
 		sample_type s = src[i];
 		fft_in[i] = sample_to_double(s) * dsp_window(i/(double)(n-1));
 	}while(++i < n);
@@ -347,7 +355,7 @@ static unsigned logfreq_current = 0;
 static unsigned freq_current = 0;
 static double max_sm_magnitude = 0;
 static double max_lg_magnitude = 0;
-static sample_type audio_for_fft[8192+256];
+static sample_type audio_for_fft[8192+256] = {0};
 static unsigned freq_data[Q_HEIGHT][FREQ_WIDTH];
 static unsigned logfreq_data[Q_HEIGHT][LOGFREQ_WIDTH];
 /*This function mostly does the moving graphics, and a few other things*/
@@ -443,7 +451,7 @@ static void dealwith_userevent(SDL_UserEvent *event){
 
 	display_stuff(freq_win_and_tex, &freq_data[0][0], freq_current%Q_HEIGHT, freq_key_image_height/*FREQ_KEYS_HEIGHT*/);
 	display_stuff(logfreq_win_and_tex, &logfreq_data[0][0], logfreq_current%Q_HEIGHT, logfreq_key_image_height/*LOGFREQ_KEYS_HEIGHT*/);
-	display_newgraph(newgraph_win_and_tex, event->data1, bytes_given);
+	display_newgraph(newgraph_win_and_tex, audio_for_fft + ARRAYSIZE(audio_for_fft) - samples_given);
 }
 
 
@@ -514,8 +522,7 @@ static void display_stuff(window_node *win_node, unsigned *data, unsigned row_in
 }
 
 
-static unsigned audio_chunks_drawn = 0;
-static void display_newgraph(window_node *win_node, sample_type *data, unsigned databytes/*, unsigned row_index*/){
+static void display_newgraph(window_node *win_node, sample_type *data){
 	if (!win_node) //check if window is closed
 		return;
 	
@@ -558,6 +565,8 @@ static void display_newgraph(window_node *win_node, sample_type *data, unsigned 
 	memcpy(tex_pixels, to_put_in_window, pitch * win_node->height);
 	SDL_UnlockTexture(win_node->tex_extra);
 	
+	if(!audio_chunks_drawn)
+		SDL_RenderClear(win_node->rend);
 
 	SDL_Rect recent_srcrect = (SDL_Rect){.x = 0,.y = 0,.w = 512/4,.h = win_node->height};
 	SDL_Rect recent_dstrect = (SDL_Rect){.x = 128 * audio_chunks_drawn,.y = 0,.w = 512/4,.h = win_node->height};
@@ -640,13 +649,11 @@ static void handle_event(SDL_Event *event){
 		}
 		break;
 	case SDL_KEYDOWN:
-		audio_chunks_drawn = 0; //since there will be new audio that is not draw
 		keyboard_down(&event->key);
 		if(graph_win_and_tex)// If NULL graph window has been closed and thus can not be updated (this if is nolonger needed)
 			graph_wave(graph_win_and_tex);
 		break;
 	case SDL_KEYUP:
-		audio_chunks_drawn = 0; //since there will be new audio that is not draw
 		key_up(event->key.keysym.scancode);
 		break;
 	case SDL_QUIT:
@@ -877,9 +884,10 @@ static void graph_win_and_tex_expose(window_node *node){
 }
 
 static void newgraph_win_and_tex_expose(window_node *node){
-	SDL_SetRenderDrawColor(node->rend,  155,80,80,  255);
+	SDL_SetRenderDrawColor(node->rend,  0,0,0,  255);
 	SDL_RenderClear(node->rend);
 	SDL_RenderPresent(node->rend);
+	//display_newgraph(node, audio_for_fft); //pointless, does same as code above
 }
 
 static void freq_win_and_tex_expose(window_node *node){
@@ -1076,7 +1084,7 @@ int main(int argc, char *argv[]) {
 
 //	Window
 	graph_win_and_tex = spec_and_mk_win_and_tex(add_window_node(&graph_win_and_tex_destroy, &graph_win_and_tex_expose), "graph", MAX_SAMPLES/3, 150, SDL_PIXELFORMAT_ARGB8888);
-	newgraph_win_and_tex = spec_and_mk_win_and_tex(add_window_node(&newgraph_win_and_tex_destroy, &newgraph_win_and_tex_expose), "new graph", 1900, 150, SDL_PIXELFORMAT_ARGB8888);
+	newgraph_win_and_tex = spec_and_mk_win_and_tex(add_window_node(&newgraph_win_and_tex_destroy, &newgraph_win_and_tex_expose), "new graph", 1234, 150, SDL_PIXELFORMAT_ARGB8888);
 	freq_win_and_tex = spec_and_mk_win_and_tex(add_window_node(&freq_win_and_tex_destroy, &freq_win_and_tex_expose), "freq", FREQ_WIDTH, LOGFREQ_HEIGHT, SDL_PIXELFORMAT_ARGB8888);
 	logfreq_win_and_tex = spec_and_mk_win_and_tex(add_window_node(&logfreq_win_and_tex_destroy, &logfreq_win_and_tex_expose), "logfreq", LOGFREQ_WIDTH, LOGFREQ_HEIGHT, SDL_PIXELFORMAT_ARGB8888);
 
