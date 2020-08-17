@@ -22,12 +22,16 @@
 //#include <SDL2/SDL.h>  //gcc -W -Wall -Wstrict-prototypes -Wmissing-prototypes -fno-common -I/usr/include/SDL2 -D_REENTRANT -g3 -Og -o kview_sdl2 main.c pngwork.c -lz -lSDL2
 
 static int quitting;
+
+#define NOTHING 0
+
 #define COLOR(r,g,b) (((r)<<16)|((g)<<8)|(b))
 #define BYTES_PER_PIXEL 3 //could have this taken from pngwork.c
 #define rgb24_STRIDE (BYTES_PER_PIXEL * png_width)
 
 #define SAMPLE_RATE 48000
 #define MAX_SAMPLES 4096
+#define NUM_SAMPLES 512
 #define NUM_TIMBRE 4
 #define NUM_PITCH 128
 #define LOGFREQ_KEY_GAP_WIDTH 1
@@ -121,6 +125,13 @@ static unsigned wave_indexs[128];
 static unsigned note_to_play = 0;
 static unsigned note_type = 0;
 static unsigned octave = 4;
+struct msg{
+	unsigned value;
+	unsigned keybits[4];
+	unsigned audio_chunks_drawn;
+	sample_type audio[];
+};
+
 static char _key_to_midi[512] = {
 	[SDL_SCANCODE_TAB] 			= 5,
 		[SDL_SCANCODE_1] 		= 6,//black
@@ -169,7 +180,6 @@ static int key_to_midi(int key){
 }
 
 
-static unsigned audio_chunks_drawn = 0; //maybe should not be here
 static unsigned keybits[4];
 
 static void key_up(int key){
@@ -181,8 +191,6 @@ static void key_up(int key){
 	const unsigned bit_index   = 0x1f & m;
 	const unsigned array_index = m >> 5;
 	keybits[array_index] &= ~(1u << bit_index);
-
-	audio_chunks_drawn = 0;
 }
 
 static void key_down(int key){
@@ -196,16 +204,15 @@ static void key_down(int key){
 
 	//check if bit is already set
 	if (!(keybits[array_index] & (1u << bit_index))){
-		audio_chunks_drawn = 0;
 		keybits[array_index] |= (1u << bit_index);
 	}
 }
 
-static int is_midi_playing(int m){
+static int is_midi_playing(int m, unsigned *local_keybits){
 	const unsigned bit_index   = 0x1f & m;
 	const unsigned array_index = m >> 5;
 
-	return keybits[array_index] & (1u << bit_index);
+	return local_keybits[array_index] & (1u << bit_index);
 }
 
 
@@ -224,7 +231,6 @@ typedef struct window_node{
 static window_node *list_head = NULL;
 
 
-static window_node *graph_win_and_tex;
 static window_node *newgraph_win_and_tex;
 static window_node *freq_win_and_tex;
 static window_node *logfreq_win_and_tex;
@@ -234,11 +240,10 @@ static fftw_complex *fft_out;
 static fftw_plan fft_sm_plan;
 static fftw_plan fft_lg_plan;
 
-static void graph_wave(window_node *window);
 static double midi_to_hz(double midi);
 static double hz_to_midi(double Hz);
 static void display_stuff(window_node *win_node, unsigned *data, unsigned row_index, unsigned key_height);
-static void display_newgraph(window_node *win_node, sample_type *data);
+static void display_newgraph(window_node *win_node, struct msg *msg);
 
 
 static window_node *add_window_node(void (*destroy)(struct window_node *is), void (*expose)(struct window_node *is)){
@@ -360,13 +365,14 @@ static unsigned freq_data[Q_HEIGHT][FREQ_WIDTH];
 static unsigned logfreq_data[Q_HEIGHT][LOGFREQ_WIDTH];
 /*This function mostly does the moving graphics, and a few other things*/
 static void dealwith_userevent(SDL_UserEvent *event){
+	struct msg *msg = event->data1;
 	logfreq_current = (logfreq_current+1)%Q_HEIGHT;
 	freq_current = (freq_current+1)%Q_HEIGHT;
 	memset(&logfreq_data[(logfreq_current -1)%Q_HEIGHT][0], 0, LOGFREQ_WIDTH * 1 * sizeof(unsigned));
 	memset(&freq_data   [(freq_current    -1)%Q_HEIGHT][0], 0, FREQ_WIDTH    * 1 * sizeof(unsigned));
 	size_t i = 1;// the first note happens when i = 5, having i start at i = 5 is maybe a better idea;
 	while (i < 128){
-		if (is_midi_playing(i)){
+		if (is_midi_playing(i, msg->keybits)){
 			// log frequency window
 			if(enabled_colors & LOGFREQ_BLUE){
 				for (size_t j = 1; j < LOGFREQ_KEY_WIDTH -1; j++){
@@ -391,7 +397,7 @@ static void dealwith_userevent(SDL_UserEvent *event){
 	}
 
 
-	unsigned long bytes_given = (long)event->data2;
+	unsigned long bytes_given = msg->value; //happens to be same as event->data2
 	unsigned long samples_given = bytes_given / sizeof(sample_type);
 	if(samples_given != 512){
 		printf("fail with bytes_given %lu, samples_given %lu\n",bytes_given, samples_given);
@@ -399,8 +405,7 @@ static void dealwith_userevent(SDL_UserEvent *event){
 	}
 
 	memmove(audio_for_fft, audio_for_fft + samples_given, sizeof audio_for_fft - bytes_given);
-	memcpy(audio_for_fft + ARRAYSIZE(audio_for_fft) - samples_given, event->data1, bytes_given);
-	free(event->data1); //this is malloced in audio callback function
+	memcpy(audio_for_fft + ARRAYSIZE(audio_for_fft) - samples_given, msg->audio, bytes_given);
 
 	double sm_mag[1024/2];
 	double lg_mag[8192/2];
@@ -451,7 +456,9 @@ static void dealwith_userevent(SDL_UserEvent *event){
 
 	display_stuff(freq_win_and_tex, &freq_data[0][0], freq_current%Q_HEIGHT, freq_key_image_height/*FREQ_KEYS_HEIGHT*/);
 	display_stuff(logfreq_win_and_tex, &logfreq_data[0][0], logfreq_current%Q_HEIGHT, logfreq_key_image_height/*LOGFREQ_KEYS_HEIGHT*/);
-	display_newgraph(newgraph_win_and_tex, audio_for_fft + ARRAYSIZE(audio_for_fft) - samples_given);
+	display_newgraph(newgraph_win_and_tex, msg);
+
+	free(msg); //this is malloced in audio callback function
 }
 
 
@@ -522,7 +529,7 @@ static void display_stuff(window_node *win_node, unsigned *data, unsigned row_in
 }
 
 
-static void display_newgraph(window_node *win_node, sample_type *data){
+static void display_newgraph(window_node *win_node, struct msg *msg){
 	if (!win_node) //check if window is closed
 		return;
 	
@@ -550,7 +557,7 @@ static void display_newgraph(window_node *win_node, sample_type *data){
 	do{
 		int j = 0;
 		do{
-			double s = data[i*4+j];
+			double s = msg->audio[i*4+j];
 			unsigned y = win_node->height - ((s - SAMPLE_MIN) * (double)(win_node->height-1) / (SAMPLE_MAX - SAMPLE_MIN)) - 1;
 			to_put_in_window[y * win_node->width + i] = 0xffffff;
 		} while (++j < 4);
@@ -565,16 +572,15 @@ static void display_newgraph(window_node *win_node, sample_type *data){
 	memcpy(tex_pixels, to_put_in_window, pitch * win_node->height);
 	SDL_UnlockTexture(win_node->tex_extra);
 	
-	if(!audio_chunks_drawn)
+	if(!msg->audio_chunks_drawn)
 		SDL_RenderClear(win_node->rend);
 
 	SDL_Rect recent_srcrect = (SDL_Rect){.x = 0,.y = 0,.w = 512/4,.h = win_node->height};
-	SDL_Rect recent_dstrect = (SDL_Rect){.x = 128 * audio_chunks_drawn,.y = 0,.w = 512/4,.h = win_node->height};
+	SDL_Rect recent_dstrect = (SDL_Rect){.x = 128 * msg->audio_chunks_drawn,.y = 0,.w = 512/4,.h = win_node->height};
 	SDL_RenderCopy(win_node->rend, win_node->tex_extra, &recent_srcrect, &recent_dstrect);
 
 	SDL_RenderPresent(win_node->rend);
 	free(to_put_in_window);
-	audio_chunks_drawn++;
 }
 
 
@@ -650,8 +656,6 @@ static void handle_event(SDL_Event *event){
 		break;
 	case SDL_KEYDOWN:
 		keyboard_down(&event->key);
-		if(graph_win_and_tex)// If NULL graph window has been closed and thus can not be updated (this if is nolonger needed)
-			graph_wave(graph_win_and_tex);
 		break;
 	case SDL_KEYUP:
 		key_up(event->key.keysym.scancode);
@@ -813,49 +817,8 @@ static void place_keys_logfreq(window_node *window){
 }
 
 
-static void graph_wave(window_node *window){
-	if (!window) //If window is closed do not mess with it
-		return;
-	
-
-	const unsigned pitch = window->width * sizeof (unsigned);
-	unsigned *to_put_in_window = calloc(pitch, window->height);
-
-
-	const sample_type *restrict some_wave = &waves[note_type][note_to_play][0];
-	int i = 0;
-	do{
-		int j = 0;
-		do{
-			double s = some_wave[i*3+j];
-			unsigned y = window->height - ((s - SAMPLE_MIN) * (double)(window->height-1) / (SAMPLE_MAX - SAMPLE_MIN)) - 1;
-			if(y < window->height)
-				to_put_in_window[y * window->width + i] = 0xffffff;
-			else
-				printf("y = %u\n, ", y);
-		} while (++j < 3);
-	} while (++i < MAX_SAMPLES/3);
-	
-
-	SDL_UpdateTexture(window->tex, NULL, to_put_in_window, pitch);
-	SDL_RenderClear(window->rend);
-	SDL_RenderCopy(window->rend, window->tex, NULL, NULL);
-	SDL_RenderPresent(window->rend);
-
-	free(to_put_in_window);
-}
-
-
-
-
 ////////////////////////////////Object Oriented windows-specific functions////////////////////////////////
 //Destroy functions for window, pointers to these functions are handed in when said windows are made.
-static void graph_win_and_tex_destroy(window_node *node){
-	SDL_DestroyTexture(node->tex);
-	SDL_DestroyTexture(node->tex_extra);
-	graph_win_and_tex = NULL;
-}
-
 static void newgraph_win_and_tex_destroy(window_node *node){
 	SDL_DestroyTexture(node->tex);
 	SDL_DestroyTexture(node->tex_extra);
@@ -879,10 +842,6 @@ static void dummy_destroy(window_node *node){
 	(void)node;
 }
 //Exposed functions for windows
-static void graph_win_and_tex_expose(window_node *node){
-	graph_wave(node);
-}
-
 static void newgraph_win_and_tex_expose(window_node *node){
 	SDL_SetRenderDrawColor(node->rend,  0,0,0,  255);
 	SDL_RenderClear(node->rend);
@@ -919,16 +878,27 @@ static void generic_expose(window_node *node){
 // This is in the audio thread
 static void audio_callback(void *userdata, Uint8 * stream, int bytes_asked_for){
 	(void)userdata;
-//	int done = 0;
 	const unsigned samples_asked_for = bytes_asked_for / sizeof (sample_type);
-	sample_type *mycopy = malloc(bytes_asked_for); //freed in userevent handler
+	static unsigned audio_chunks_drawn;
+	struct msg *msg = malloc(sizeof *msg + bytes_asked_for);
+	msg->value = bytes_asked_for;
+	memcpy(msg->keybits, keybits, sizeof keybits);
+	static unsigned prev_keybits[4];
 
+	if (memcmp(msg->keybits, prev_keybits, sizeof prev_keybits)){
+		memcpy(prev_keybits, msg->keybits, sizeof prev_keybits);
+		audio_chunks_drawn = 0;
+	}else{
+		audio_chunks_drawn++;
+	}
+	msg->audio_chunks_drawn = audio_chunks_drawn;
+	
 	unsigned s = 0;
 	do{
 		double sum = 0.0;
 		unsigned m = 0;
 		do{
-			if (!is_midi_playing(m))
+			if (!is_midi_playing(m, msg->keybits))
 				continue;
 			// OLD CODE:
 			// const unsigned waves_size = num_samples[note_to_play] * sizeof(sample_type);
@@ -940,14 +910,14 @@ static void audio_callback(void *userdata, Uint8 * stream, int bytes_asked_for){
 				where = 0;
 			wave_indexs[m] = where;
 		} while (++m < 128);
-		mycopy[s] = double_to_sample(limiter(sum/4));
+		msg->audio[s] = double_to_sample(limiter(sum/4));
 	} while (++s < samples_asked_for);
 	
-	memcpy(stream, mycopy, bytes_asked_for);
+	memcpy(stream, msg->audio, bytes_asked_for);
 
 
 	SDL_Event e;
-	e.user.data1 = mycopy;
+	e.user.data1 = msg;
 	e.user.data2 = (void*)(long)bytes_asked_for;
 	e.type = SDL_USEREVENT;
 
@@ -955,7 +925,7 @@ static void audio_callback(void *userdata, Uint8 * stream, int bytes_asked_for){
 }
 
 
-SDL_AudioSpec wanted={
+static SDL_AudioSpec wanted={
 	.freq = SAMPLE_RATE,
 	.format = AUDIO_KEVIN,
 	.channels = 1,
@@ -966,7 +936,6 @@ SDL_AudioSpec wanted={
 	.callback = &audio_callback,
 	.userdata = &waves[0][0][0],
 };
-SDL_AudioSpec actual;
 
 
 static double midi_to_hz(double midi){
@@ -1083,8 +1052,7 @@ int main(int argc, char *argv[]) {
 	
 
 //	Window
-	graph_win_and_tex = spec_and_mk_win_and_tex(add_window_node(&graph_win_and_tex_destroy, &graph_win_and_tex_expose), "graph", MAX_SAMPLES/3, 150, SDL_PIXELFORMAT_ARGB8888);
-	newgraph_win_and_tex = spec_and_mk_win_and_tex(add_window_node(&newgraph_win_and_tex_destroy, &newgraph_win_and_tex_expose), "new graph", 1234, 150, SDL_PIXELFORMAT_ARGB8888);
+	newgraph_win_and_tex = spec_and_mk_win_and_tex(add_window_node(&newgraph_win_and_tex_destroy, &newgraph_win_and_tex_expose), "graph", 1234+123, 150, SDL_PIXELFORMAT_ARGB8888);
 	freq_win_and_tex = spec_and_mk_win_and_tex(add_window_node(&freq_win_and_tex_destroy, &freq_win_and_tex_expose), "freq", FREQ_WIDTH, LOGFREQ_HEIGHT, SDL_PIXELFORMAT_ARGB8888);
 	logfreq_win_and_tex = spec_and_mk_win_and_tex(add_window_node(&logfreq_win_and_tex_destroy, &logfreq_win_and_tex_expose), "logfreq", LOGFREQ_WIDTH, LOGFREQ_HEIGHT, SDL_PIXELFORMAT_ARGB8888);
 
