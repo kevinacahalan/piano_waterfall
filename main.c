@@ -321,7 +321,11 @@ static sample_type double_to_sample(double d){
 		return d;
 	long long s = (d + 1)/2 * (SAMPLE_MAX - (double)SAMPLE_MIN) + SAMPLE_MIN;
 	if(s > (long long)SAMPLE_MAX || s < (long long)SAMPLE_MIN)
+		#ifdef WIN32
+		printf("double_to_sample saw %I64d\n",s);
+		#else
 		printf("double_to_sample saw %lld\n",s);
+		#endif
 	return s;
 }
 
@@ -918,7 +922,7 @@ static void audio_callback(void *userdata, Uint8 * stream, int bytes_asked_for){
 
 	SDL_Event e;
 	e.user.data1 = msg;
-	e.user.data2 = (void*)(long)bytes_asked_for;
+	e.user.data2 = (void*)(intptr_t)bytes_asked_for;
 	e.type = SDL_USEREVENT;
 
 	SDL_PushEvent(&e);
