@@ -15,7 +15,7 @@ ifeq ($(OS),Windows_NT)
 # To decompress use "tar -xzf [thing to decompress]", the tar canmand comes with the mingw-w64 tool kit.
 # After decompressing you should get a folder called SDL2-2.#.## with a folder inside called
 # x86_64-w64-mingw32. That folder called is what will be referrerd to as the "SDL2 library folder".
-# Change the name if this library folder to something good like "libsdl2" and place it where you want.
+# Change the name of this library folder to something good like "libsdl2" and place it where you want.
 # Next do the same stuff done with the fftw3 library folder, kind of....
 #
 # Start by taking SDL2.dll from [location of SDL2 library folder]\bin and put it in the same spot as this
@@ -24,7 +24,9 @@ ifeq ($(OS),Windows_NT)
 # Then set SDL2_LIBS to be -L"[location of SDL2 library folder]\lib" -lmingw32 -lSDL2main -lSDL2 -mwindows -Dmain=SDL_main
 
 # if you don't have your SDL2 and fftw3 library folders called libsdl2 & libfftw3 and located at "C:\"
-# changes the flags below:
+# change the flags for windows below:
+
+#windows flags
 SDL2_CFLAGS := -I"C:\libsdl2\include\SDL2"
 SDL2_LIBS := -L"C:\libsdl2\lib" -lmingw32 -lSDL2main -lSDL2 -mwindows -Dmain=SDL_main
 FFTW3_CFLAGS := -I"C:\libfftw3"
