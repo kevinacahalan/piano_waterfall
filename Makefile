@@ -12,7 +12,7 @@ ifeq ($(OS),Windows_NT)
 
 # For SDL2 get the library here: https://www.libsdl.org/download-2.0.php
 # Download the Development library for windows mingw called SDL2-devel-2.#.##-mingw.tar.gz and decompress.
-# To decompress use "tar -xzf [thing to decompress]", the tar canmand comes with the mingw-w64 tool kit.
+# To decompress use "tar -xzf [thing to decompress]", the tar command comes with the mingw-w64 tool kit.
 # After decompressing you should get a folder called SDL2-2.#.## with a folder inside called
 # x86_64-w64-mingw32. That folder called is what will be referrerd to as the "SDL2 library folder".
 # Change the name of this library folder to something good like "libsdl2" and place it where you want.
