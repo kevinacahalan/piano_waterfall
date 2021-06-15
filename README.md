@@ -26,4 +26,4 @@ If the `make -k` command does not compile the program, try `mingw32-make -k`
 
 
 
-On mac and some linux distributions the program is little buggy graphically for some reason
+On mac the program is little buggy graphically for some reason
