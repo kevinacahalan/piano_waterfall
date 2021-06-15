@@ -20,7 +20,7 @@ run the command `make -k` in the project directory.
 If the `make -k` command does not compile the program, try `mingw32-make -k` 
 
 
-
+##### An mage of the program running on windows
 ![Test Image 1](my_program.png)
 
 
