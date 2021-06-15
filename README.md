@@ -6,10 +6,10 @@ Piano program with FFT waterfall plot, wave graph, piano roll
 - compile run `make -k` in the project directory
 
 ### To compile on mac:
-install brew `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)`
-
+- install brew `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)`
 - install sdl `brew install sdl2`
 - install fftw3 `brew install fftw`
+- You probably already have a compiler installed, if not a dialog box will pop up for installing clang and some stuff
 - To compile run `make -k` in the project directory
 
 
