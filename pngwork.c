@@ -204,7 +204,7 @@ int process_png(unsigned const char *const filedata, int filesize, unsigned *png
     unsigned filterstride = bits_per_pixel < 8 ? 1 : bits_per_pixel / 8;
     unsigned pixel_bytesperrow = (*png_width * bits_per_pixel + 7)/8; //pixel_bytesperrow is same in ppm & png
     unsigned total_bytesperrow = pixel_bytesperrow + 1;
-    printf("...pixel_bytesperrow: %u\n", pixel_bytesperrow);
+    // printf("...pixel_bytesperrow: %u\n", pixel_bytesperrow);
 
 
     //Undoing zlib and getting ready for taking apart PNG

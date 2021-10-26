@@ -1050,11 +1050,7 @@ static void generate_all_waves(void){
 int main(int argc, char *argv[]) {
 	(void)argc;
 
-	if (argc < 1){
-		puts("Too few args");
-		return 1;
-	}
-//	start SDL
+	// start SDL
 	if(SDL_Init(SDL_INIT_EVERYTHING)<0) {
 		printf("Failed SDL_Init %s\n", SDL_GetError());
 		return 1;
@@ -1063,44 +1059,44 @@ int main(int argc, char *argv[]) {
 	}
 	
 
-//	generate and start audio:
+	// generate and start audio:
 	puts("generating waves and starting audio");
 	generate_all_waves();
-//	SDL_OpenAudio(&wanted, &actual); // Letting SDL choose buffer size (etc.) makes things harder
-	SDL_OpenAudio(&wanted, NULL); // NULL forces SDL to obey
+	// SDL_OpenAudio(&wanted, &actual); // Letting SDL choose buffer size (etc.) makes things harder
+	SDL_OpenAudio(&wanted, NULL); // NULL forces SDL to obey wanted
 	SDL_PauseAudio(0);
 	puts("done");
 
-//	Do image stuff(Should remove/commit out)
+	// Do image stuff(Should remove/commit out)
 	while (*++argv){
 		printf("\n%s:\n", argv[0]);
 		show_img_windowed(add_window_node(&dummy_destroy, &generic_expose), argv[0]);
 	}
 	
 
-//	Window
+	// Window
 	newgraph_win_and_tex = spec_and_mk_win_and_tex(add_window_node(&newgraph_win_and_tex_destroy, &newgraph_win_and_tex_expose), "graph", 1234+123, 150, SDL_PIXELFORMAT_ARGB8888);
 	freq_win_and_tex = spec_and_mk_win_and_tex(add_window_node(&freq_win_and_tex_destroy, &freq_win_and_tex_expose), "freq", FREQ_WIDTH, LOGFREQ_HEIGHT, SDL_PIXELFORMAT_ARGB8888);
 	logfreq_win_and_tex = spec_and_mk_win_and_tex(add_window_node(&logfreq_win_and_tex_destroy, &logfreq_win_and_tex_expose), "logfreq", LOGFREQ_WIDTH, LOGFREQ_HEIGHT, SDL_PIXELFORMAT_ARGB8888);
 
 
-//fft
+	// fft
 	fft_in = fftw_malloc(sizeof(fftw_complex) * 8192);
 	fft_out = fftw_malloc(sizeof(fftw_complex) * 8192);
 	fft_sm_plan = fftw_plan_dft_1d(1024, fft_in, fft_out, FFTW_FORWARD, FFTW_ESTIMATE);
 	fft_lg_plan = fftw_plan_dft_1d(8192, fft_in, fft_out, FFTW_FORWARD, FFTW_ESTIMATE);
 
-//	event stuff (where program spends most of its time)
+	// Event loop (where program spends most of its time)
 	while(!quitting) {
 		SDL_Event e;
-		//If quiting, will not check events
-		//Should change up to use SDL_WaitEvent, budgie seems crashs more if I do so... 
+
+		//If quiting, will not check events 
 		while(!quitting && SDL_WaitEvent(&e)){
 			handle_event(&e);
 		}
 	}
 	
-//	Quiting stuff
+	// Quiting stuff
 	fftw_destroy_plan(fft_sm_plan);
 	fftw_destroy_plan(fft_lg_plan);
 	fftw_free(fft_in);
