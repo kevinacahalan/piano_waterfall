@@ -132,6 +132,9 @@ struct msg{
 	sample_type audio[];
 };
 
+// Lookup array for going from SDL key codes to notes. If a Key does not correspond to a
+// note, that key is considered note 0. Note 0 is a nobody note.
+//
 static char _key_to_midi[512] = {
 	[SDL_SCANCODE_TAB] 			= 5,
 		[SDL_SCANCODE_1] 		= 6,//black
@@ -158,16 +161,19 @@ static char _key_to_midi[512] = {
 		[SDL_SCANCODE_BACKSPACE]= 27,//black
 	[SDL_SCANCODE_BACKSLASH] 	= 28,
 
-	[SDL_SCANCODE_SPACE] 	= 1,
-	[SDL_SCANCODE_Z] 		= 2,
-	[SDL_SCANCODE_X] 		= 3,
-	[SDL_SCANCODE_C] 		= 4,
-	[SDL_SCANCODE_V] 		= 5,
-	[SDL_SCANCODE_B] 		= 6,
-	[SDL_SCANCODE_N] 		= 7,
-	[SDL_SCANCODE_M] 		= 8,
+	// Random keys used for debugging:
+	//
+	// [SDL_SCANCODE_SPACE] 	= 1,
+	// [SDL_SCANCODE_Z] 		= 2,
+	// [SDL_SCANCODE_X] 		= 3,
+	// [SDL_SCANCODE_C] 		= 4,
+	// [SDL_SCANCODE_V] 		= 5,
+	// [SDL_SCANCODE_B] 		= 6,
+	// [SDL_SCANCODE_N] 		= 7,
+	// [SDL_SCANCODE_M] 		= 8,
 };
 
+// Turns key number to midi number
 static int key_to_midi(int key){
 	int m = _key_to_midi[key];
 	if (!m)
@@ -179,10 +185,12 @@ static int key_to_midi(int key){
 	return m;
 }
 
-
+// There are 128 notes, keysbits is an array of 4 32bit unsigned int's...thats 128bits
 static unsigned keybits[4];
 
-static void key_up(int key){
+// This function is called whenever a key goes up. If that key corresponds to a note, that
+// note is turned off.
+static void note_key_up(int key){
 	int m = key_to_midi(key);
 	if (!m)
 		return;
@@ -193,7 +201,10 @@ static void key_up(int key){
 	keybits[array_index] &= ~(1u << bit_index);
 }
 
-static void key_down(int key){
+// After some specific keys are checked for in keyboard_down(), this function is called
+// for the case the key pushed down is not special. If that key corresponds to a note, that
+// note is turned off.
+static void note_key_done(int key){
 	int m = key_to_midi(key);
 	if (!m)
 		return;
@@ -208,6 +219,7 @@ static void key_down(int key){
 	}
 }
 
+// Check if specific note/midi is playing
 static int is_midi_playing(int m, unsigned *local_keybits){
 	const unsigned bit_index   = 0x1f & m;
 	const unsigned array_index = m >> 5;
@@ -215,19 +227,19 @@ static int is_midi_playing(int m, unsigned *local_keybits){
 	return local_keybits[array_index] & (1u << bit_index);
 }
 
-
+// Struct for keeping track of a window. The window structs are kept track of in a singly linked list.
 typedef struct window_node{
 	struct window_node *next;
-	void (*destroy)(struct window_node *is);
-	void (*expose)(struct window_node *is);
-	unsigned width;
-	unsigned height;
-	char *name;
+	void (*destroy)(struct window_node *is); // Pointer to destroy method
+	void (*expose)(struct window_node *is); // Pointer to expose method
+	unsigned width; // Width of windows in pixels
+	unsigned height; // Height of window in pixels
+	char *name; // The name that shows up on the window bar
 	SDL_Window *win;
 	SDL_Renderer *rend;
 	SDL_Texture *tex;
 	SDL_Texture *tex_extra;
-}window_node; //typedef does not work til this line
+}window_node; // typedef does not work til this line
 static window_node *list_head = NULL;
 
 
@@ -587,57 +599,57 @@ static void display_newgraph(window_node *win_node, struct msg *msg){
 	free(to_put_in_window);
 }
 
-
+// Function to process a keyboard down event
 static void keyboard_down(SDL_KeyboardEvent *event){
 
 	switch(event->keysym.scancode){
 	case SDL_SCANCODE_ESCAPE:
 		quitting=1;
 		break;
-	case SDL_SCANCODE_F1:
+	case SDL_SCANCODE_F1: // Set notetype to sawtooth wave
 		note_type = 0;
 		break;
-	case SDL_SCANCODE_F2:
+	case SDL_SCANCODE_F2: // Set note_type to square wave
 		note_type = 1;
 		break;
-	case SDL_SCANCODE_F3:
+	case SDL_SCANCODE_F3: // Set note_type to sine wave
 		note_type = 2;
 		break;
-	case SDL_SCANCODE_F4:
+	case SDL_SCANCODE_F4: // Set note_type to triangle wave
 		note_type = 3;
 		break;
-	case SDL_SCANCODE_INSERT:
+	case SDL_SCANCODE_INSERT: // Key to toggle red fft graph in freq window
 		enabled_colors ^= FREQ_RED;
 		break;
-	case SDL_SCANCODE_HOME:
+	case SDL_SCANCODE_HOME: // Key to toggle green fft graph in freq window
 		enabled_colors ^= FREQ_GREEN;
 		break;
-	case SDL_SCANCODE_PAGEUP:
+	case SDL_SCANCODE_PAGEUP: // Key to toggle blue key marks in freq window
 		enabled_colors ^= FREQ_BLUE;
 		break;
-	case SDL_SCANCODE_DELETE:
+	case SDL_SCANCODE_DELETE: // Key to toggle red fft graph in freqlog window
 		enabled_colors ^= LOGFREQ_RED;
 		break;
-	case SDL_SCANCODE_END:
+	case SDL_SCANCODE_END: // Key to toggle green fft graph in logfreq window
 		enabled_colors ^= LOGFREQ_GREEN;
 		break;
-	case SDL_SCANCODE_PAGEDOWN:
+	case SDL_SCANCODE_PAGEDOWN: // Key to toggle blue key marks in logfreq window
 		enabled_colors ^= LOGFREQ_BLUE;
 		break;
-	case SDL_SCANCODE_RIGHT:
+	case SDL_SCANCODE_RIGHT: // Inscrease octave 
 		if (octave < 7){
 			octave++;
 			memset(keybits, 0, sizeof keybits);
 		}
 		break;
-	case SDL_SCANCODE_LEFT:
+	case SDL_SCANCODE_LEFT: // Decrease octave
 		if (octave > 1){
 			octave--;
 			memset(keybits, 0, sizeof keybits);
 		}
 		break;
-	default:
-		key_down(event->keysym.scancode);
+	default: // The key down is some key other than the ones listed above
+		note_key_done(event->keysym.scancode);
 		break;
 	}
 }
@@ -662,7 +674,7 @@ static void handle_event(SDL_Event *event){
 		keyboard_down(&event->key);
 		break;
 	case SDL_KEYUP:
-		key_up(event->key.keysym.scancode);
+		note_key_up(event->key.keysym.scancode);
 		break;
 	case SDL_QUIT:
 		quitting=1;
@@ -709,8 +721,8 @@ static void mk_win_and_tex(window_node *window, int format){
 	window->tex = SDL_CreateTexture(
 		window->rend,
 		format,
-		//SDL_TEXTUREACCESS_STATIC, //to use CPU
-		SDL_TEXTUREACCESS_STREAMING, //to use GPU
+		// SDL_TEXTUREACCESS_STATIC, // to use CPU
+		SDL_TEXTUREACCESS_STREAMING, // to use GPU
 		window->width,
 		window->height
 	);
@@ -726,7 +738,10 @@ static window_node *spec_and_mk_win_and_tex(window_node *window, char *name, uns
 	return window;
 }
 
-
+// Function for displaying image windows. A random capability of this program. This program 
+// first started as a png to ppm image converter written in python. Later that python program
+// was re-written in C. The C version ran MUUUUUCH faster. That C program got turned into an
+// image viewer. Later that image viewer later turned into a piano thing.
 static void show_img_windowed(window_node *window, char *name){
 	window->name = name;
 	char *rgb24;
@@ -746,6 +761,7 @@ static void show_img_windowed(window_node *window, char *name){
 
 
 static void place_keys_freq(window_node *window){
+	// 128.h is a png file converted to C array syntex
 	static const unsigned char png_128[] = {
 #		include "128.h"
 	};
@@ -777,10 +793,6 @@ static void place_keys_freq(window_node *window){
 	} while (++y < freq_key_image_height);
 	
 
-
-
-
-
 //	if keysrc.w = srckeys_width, image is scaled when window is wider then image, else image will be black
 	SDL_Rect keysrc = (SDL_Rect){.x = 0,.y = 0,.w = window->width,.h = freq_key_image_height};
 	SDL_Rect keydst = (SDL_Rect){.x = 0,.y = window->height - freq_key_image_height,.w = window->width,.h = freq_key_image_height};
@@ -794,7 +806,9 @@ static void place_keys_freq(window_node *window){
 }
 
 
+//
 static void place_keys_logfreq(window_node *window){
+	// 128.h is a png file converted to C array syntex
 	static const unsigned char png_128[] = {
 #		include "128.h"
 	};
@@ -808,7 +822,7 @@ static void place_keys_logfreq(window_node *window){
 	rgb24_to_rgb32(srckeys_width, logfreq_key_image_height, rgb24data, (char*)to_put_in_rect, texpitch);
 	free(rgb24data);
 
-//	if keysrc.w = srckeys_width, image is scaled when window is wider then image, else image will be black
+//	if keysrc.w = srckeys_width, image is scaled when window is wider than image, else image will be black
 	SDL_Rect keysrc = (SDL_Rect){.x = 0,.y = 0,.w = window->width,.h = logfreq_key_image_height};
 	SDL_Rect keydst = (SDL_Rect){.x = 0,.y = window->height - logfreq_key_image_height,.w = window->width,.h = logfreq_key_image_height};
 
@@ -817,12 +831,16 @@ static void place_keys_logfreq(window_node *window){
 	if (SDL_RenderCopy(window->rend, window->tex, &keysrc, &keydst))
 		puts("error");
 	free(to_put_in_rect);
-
 }
 
 
 ////////////////////////////////Object Oriented windows-specific functions////////////////////////////////
-//Destroy functions for window, pointers to these functions are handed in when said windows are made.
+// Destroy functions for window, pointers to these functions are handed in when said windows are made.
+//
+// With closing windows, sometimes special things need to happen on a per window basics. A windows might
+// have some special memory that needs to be free'd. Maybe we want a closing animation or sound, or so on.
+// Anyway these functions are for making things happen when a window is closed. When a windows is first
+// constructed it will be given a pointer to one of these functions.
 static void newgraph_win_and_tex_destroy(window_node *node){
 	SDL_DestroyTexture(node->tex);
 	SDL_DestroyTexture(node->tex_extra);
@@ -845,7 +863,11 @@ static void logfreq_win_and_tex_destroy(window_node *node){
 static void dummy_destroy(window_node *node){
 	(void)node;
 }
-//Exposed functions for windows
+
+// Expose functions for windows. When a new windows is constructed, it is given
+// a pointer to one of these expose functions. For windows that don't need anything
+// special to happen to be drawn, these windows are give a pointer to the generic 
+// function.
 static void newgraph_win_and_tex_expose(window_node *node){
 	SDL_SetRenderDrawColor(node->rend,  0,0,0,  255);
 	SDL_RenderClear(node->rend);
@@ -879,8 +901,9 @@ static void generic_expose(window_node *node){
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// This is in the audio thread
-static void audio_callback(void *userdata, Uint8 * stream, int bytes_asked_for){
+// This function runs on the audio thread. The SDL audio thread calls this function
+// when it needs more audio to play.
+static void audio_callback(void *userdata, Uint8 *stream, int bytes_asked_for){
 	(void)userdata;
 	const unsigned samples_asked_for = bytes_asked_for / sizeof (sample_type);
 	static unsigned audio_chunks_drawn;
@@ -930,15 +953,15 @@ static void audio_callback(void *userdata, Uint8 * stream, int bytes_asked_for){
 
 
 static SDL_AudioSpec wanted={
-	.freq = SAMPLE_RATE,
-	.format = AUDIO_KEVIN,
-	.channels = 1,
+	.freq = SAMPLE_RATE, // samples per second
+	.format = AUDIO_KEVIN, // Format of samples
+	.channels = 1, // Number of audio channels, 1 for mono
 	.silence = 0,
-	.samples = 512,
+	.samples = 512, // bits per sample?
 	.padding = 0,
-	.size = 100000,
-	.callback = &audio_callback,
-	.userdata = &waves[0][0][0],
+	.size = 100000, // Size of something, I do not remember
+	.callback = &audio_callback, // Function pointer to function SDL sound thread calls to get more audio
+	.userdata = &waves[0][0][0], // I do not remember what this was for
 };
 
 
