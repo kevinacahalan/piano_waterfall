@@ -25,5 +25,5 @@ If the `make -k` command does not compile the program, try `mingw32-make -k`
 
 
 
-
-On mac the program is little buggy graphically for some reason
+### Known issues:
+- On mac the key images on the bottom of the freq and logfreq windows are a little buggy graphically for some reason. This is also an issue on linux with some desktop environments and graphics drivers. The way that image is displayed is probably non-standard and incorrect.
