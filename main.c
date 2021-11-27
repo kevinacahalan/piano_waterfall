@@ -54,7 +54,7 @@ unsigned logfreq_key_image_height /*= LOGFREQ_KEYS_HEIGHT*/;
 #define FREQ_GREEN    0x00000010
 #define FREQ_BLUE     0x00000020
 
-static unsigned enabled_colors = LOGFREQ_RED|LOGFREQ_GREEN|LOGFREQ_BLUE|FREQ_RED|FREQ_GREEN|FREQ_BLUE;
+static unsigned enabled_colors = LOGFREQ_RED|LOGFREQ_BLUE|FREQ_RED|FREQ_BLUE;
 
 #if 0
 #define SAMPLE_MAX 0x7fff
