@@ -10,8 +10,8 @@
 #include <fftw3.h>
 
 
-//#include <SDL/SDL.h>   //gcc -W -Wall -Wstrict-prototypes -Wmissing-prototypes -fno-common -I/usr/include/SDL -D_GNU_SOURCE=1 -D_REENTRANT -g3 -Og -o kview_sdl1 main.c pngwork.c -lz -L/usr/lib/x86_64-linux-gnu -lSDL
-//#include <SDL2/SDL.h>  //gcc -W -Wall -Wstrict-prototypes -Wmissing-prototypes -fno-common -I/usr/include/SDL2 -D_REENTRANT -g3 -Og -o kview_sdl2 main.c pngwork.c -lz -lSDL2
+// #include <SDL/SDL.h>   //gcc -W -Wall -Wstrict-prototypes -Wmissing-prototypes -fno-common -I/usr/include/SDL -D_GNU_SOURCE=1 -D_REENTRANT -g3 -Og -o kview_sdl1 main.c pngwork.c -lz -L/usr/lib/x86_64-linux-gnu -lSDL
+// #include <SDL2/SDL.h>  //gcc -W -Wall -Wstrict-prototypes -Wmissing-prototypes -fno-common -I/usr/include/SDL2 -D_REENTRANT -g3 -Og -o kview_sdl2 main.c pngwork.c -lz -lSDL2
 
 static int quitting;
 
@@ -129,28 +129,28 @@ struct msg{
 //
 static char _key_to_midi[512] = {
 	[SDL_SCANCODE_TAB] 			= 5,
-		[SDL_SCANCODE_1] 		= 6,//black
+		[SDL_SCANCODE_1] 		= 6, // black
 	[SDL_SCANCODE_Q]			= 7,
-		[SDL_SCANCODE_2]		= 8,//black
+		[SDL_SCANCODE_2]		= 8, // black
 	[SDL_SCANCODE_W] 			= 9,
-		[SDL_SCANCODE_3] 		= 10,//black
+		[SDL_SCANCODE_3] 		= 10, // black
 	[SDL_SCANCODE_E] 			= 11,
 	[SDL_SCANCODE_R] 			= 12,
-		[SDL_SCANCODE_5] 		= 13,//black
+		[SDL_SCANCODE_5] 		= 13, // black
 	[SDL_SCANCODE_T] 			= 14,
-		[SDL_SCANCODE_6] 		= 15,//black
+		[SDL_SCANCODE_6] 		= 15, // black
 	[SDL_SCANCODE_Y] 			= 16,
 	[SDL_SCANCODE_U] 			= 17,
-		[SDL_SCANCODE_8] 		= 18,//black
+		[SDL_SCANCODE_8] 		= 18, // black
 	[SDL_SCANCODE_I] 			= 19,
-		[SDL_SCANCODE_9] 		= 20,//black
+		[SDL_SCANCODE_9] 		= 20, // black
 	[SDL_SCANCODE_O] 			= 21,
-		[SDL_SCANCODE_0] 		= 22,//black
+		[SDL_SCANCODE_0] 		= 22, // black
 	[SDL_SCANCODE_P] 			= 23,
 	[SDL_SCANCODE_LEFTBRACKET] 	= 24,
-		[SDL_SCANCODE_EQUALS] 	= 25,//black
+		[SDL_SCANCODE_EQUALS] 	= 25, // black
 	[SDL_SCANCODE_RIGHTBRACKET] = 26,
-		[SDL_SCANCODE_BACKSPACE]= 27,//black
+		[SDL_SCANCODE_BACKSPACE]= 27, // black
 	[SDL_SCANCODE_BACKSLASH] 	= 28,
 
 	// Random keys used for debugging:
@@ -200,12 +200,12 @@ static void note_key_done(int key){
 	int m = key_to_midi(key);
 	if (!m)
 		return;
-	note_to_play = m; //after multi sound support remove this line
+	note_to_play = m; // after multi sound support remove this line
 
 	const unsigned bit_index   = 0x1f & m;
 	const unsigned array_index = m >> 5;
 
-	//check if bit is already set
+	// check if bit is already set
 	if (!(keybits[array_index] & (1u << bit_index))){
 		keybits[array_index] |= (1u << bit_index);
 	}
@@ -339,8 +339,7 @@ static double limiter(double x){
 
 static double dsp_window(double x){
 	return cos((x-0.5)*2*M_PI)/2 + 0.5;
-	//return 0.5 + sin(x*M_PI)/2;
-
+	// return 0.5 + sin(x*M_PI)/2;
 }
 
 static void compute_spectrum(double *restrict const dst, const sample_type *restrict const src, unsigned n, fftw_plan plan, double *restrict const max_mag){
@@ -405,7 +404,7 @@ static void dealwith_userevent(SDL_UserEvent *event){
 	}
 
 
-	unsigned long bytes_given = msg->value; //happens to be same as event->data2
+	unsigned long bytes_given = msg->value; // happens to be same as event->data2
 	unsigned long samples_given = bytes_given / sizeof(sample_type);
 	if(samples_given != 512){
 		printf("fail with bytes_given %lu, samples_given %lu\n",bytes_given, samples_given);
@@ -425,7 +424,7 @@ static void dealwith_userevent(SDL_UserEvent *event){
 		i = 0;
 		do{
 			double sm_magnitude = sm_mag[i/8];
-			freq_data[(freq_current -2)%Q_HEIGHT][i] |= magnitude_to_sRGB(sm_magnitude) << 8; //shift left by 8 makes green
+			freq_data[(freq_current -2)%Q_HEIGHT][i] |= magnitude_to_sRGB(sm_magnitude) << 8; // shift left by 8 makes green
 		}while(++i < FREQ_WIDTH);
 	}
 
@@ -433,7 +432,7 @@ static void dealwith_userevent(SDL_UserEvent *event){
 		i = 0;
 		do{
 			double lg_magnitude = lg_mag[i];
-			freq_data[(freq_current -9)%Q_HEIGHT][i] |= magnitude_to_sRGB(lg_magnitude) << 16; //shift left by 16 makes red
+			freq_data[(freq_current -9)%Q_HEIGHT][i] |= magnitude_to_sRGB(lg_magnitude) << 16; // shift left by 16 makes red
 		}while(++i < FREQ_WIDTH);
 	}
 	
@@ -446,7 +445,7 @@ static void dealwith_userevent(SDL_UserEvent *event){
 			if(idx >= ARRAYSIZE(sm_mag))
 				continue;
 			double sm_magnitude = sm_mag[idx];
-			logfreq_data[(logfreq_current -2)%Q_HEIGHT][i] |= magnitude_to_sRGB(sm_magnitude) << 8; //shift left by 8 makes green
+			logfreq_data[(logfreq_current -2)%Q_HEIGHT][i] |= magnitude_to_sRGB(sm_magnitude) << 8; // shift left by 8 makes green
 		}while(++i < LOGFREQ_WIDTH);
 	}
 
@@ -458,7 +457,7 @@ static void dealwith_userevent(SDL_UserEvent *event){
 			if(idx >= ARRAYSIZE(lg_mag))
 				continue;
 			double lg_magnitude = lg_mag[idx];
-			logfreq_data[(logfreq_current -9)%Q_HEIGHT][i] |= magnitude_to_sRGB(lg_magnitude) << 16; //shift left by 16 makes red
+			logfreq_data[(logfreq_current -9)%Q_HEIGHT][i] |= magnitude_to_sRGB(lg_magnitude) << 16; // shift left by 16 makes red
 		}while(++i < LOGFREQ_WIDTH);
 	}
 
@@ -471,10 +470,11 @@ static void dealwith_userevent(SDL_UserEvent *event){
 
 
 static void display_stuff(window_node *win_node, unsigned *data, unsigned row_index, unsigned key_height){
-	if (!win_node) //check if window is closed
+	// check if window is closed
+	if (!win_node)
 		return;
 	
-//	const unsigned pitch = win_node->width * sizeof (unsigned);
+	// const unsigned pitch = win_node->width * sizeof (unsigned);
 
 	const unsigned dst_avail = win_node->height - key_height;
 
@@ -492,8 +492,8 @@ static void display_stuff(window_node *win_node, unsigned *data, unsigned row_in
 		win_node->tex_extra = SDL_CreateTexture(
 			win_node->rend,
 			SDL_PIXELFORMAT_ARGB8888,
-			// SDL_TEXTUREACCESS_STATIC, //to use CPU
-			SDL_TEXTUREACCESS_STREAMING, //to use GPU
+			// SDL_TEXTUREACCESS_STATIC, // to use CPU
+			SDL_TEXTUREACCESS_STREAMING, // to use GPU
 			win_node->width,
 			Q_HEIGHT
 		);
@@ -502,7 +502,7 @@ static void display_stuff(window_node *win_node, unsigned *data, unsigned row_in
 	int tex_pitch;
 	void *tex_pixels;
 
-	//recent and earlier, texture start and length
+	// recent and earlier, texture start and length
 	unsigned rts = row_index - 9;
 	unsigned rtl = 9;
 	unsigned ets = row_index - 9;
@@ -545,8 +545,8 @@ static void display_newgraph(window_node *win_node, struct msg *msg){
 		win_node->tex_extra = SDL_CreateTexture(
 			win_node->rend,
 			SDL_PIXELFORMAT_ARGB8888,
-			// SDL_TEXTUREACCESS_STATIC, //to use CPU
-			SDL_TEXTUREACCESS_STREAMING, //to use GPU
+			// SDL_TEXTUREACCESS_STATIC, // to use CPU
+			SDL_TEXTUREACCESS_STREAMING, // to use GPU
 			win_node->width,
 			Q_HEIGHT
 		);
@@ -555,9 +555,6 @@ static void display_newgraph(window_node *win_node, struct msg *msg){
 	int tex_pitch;
 	void *tex_pixels;
 
-
-
-/**/
 	const unsigned pitch = win_node->width * sizeof (unsigned);
 	unsigned *to_put_in_window = calloc(pitch, win_node->height);
 
@@ -570,9 +567,6 @@ static void display_newgraph(window_node *win_node, struct msg *msg){
 			to_put_in_window[y * win_node->width + i] = 0xffffff;
 		} while (++j < 4);
 	} while (++i < 512/4);
-/**/
-
-
 
 	SDL_Rect recent_texrect = (SDL_Rect){.x=0, .y=0, .w = win_node->width, .h = win_node->height};
 	SDL_LockTexture(win_node->tex_extra, &recent_texrect, &tex_pixels, &tex_pitch);
@@ -739,7 +733,7 @@ static void show_img_windowed(window_node *window, char *name){
 	char *rgb24;
 	getprocessed_png(window->name, &window->width, &window->height, &rgb24);
 	const unsigned pitch = window->width * sizeof (unsigned);
-	char *rgb32 = malloc(pitch * window->height); //this malloc should be done in rgb24_to_rgb32
+	char *rgb32 = malloc(pitch * window->height);
 	rgb24_to_rgb32(window->width, window->height, rgb24, rgb32, pitch);
 	mk_win_and_tex(window, SDL_PIXELFORMAT_ARGB8888);
 	SDL_UpdateTexture(window->tex, NULL, rgb32, pitch);
@@ -762,7 +756,7 @@ static void place_keys_freq(window_node *window){
 
 	process_png(png_128, sizeof png_128, &srckeys_width, &freq_key_image_height,&rgb24data);
 
-	unsigned *unscaled = calloc(srckeys_width * sizeof *unscaled, freq_key_image_height); //maybe should be done in rgb24_to_rgb_32
+	unsigned *unscaled = calloc(srckeys_width * sizeof *unscaled, freq_key_image_height);
 	rgb24_to_rgb32(srckeys_width, freq_key_image_height, rgb24data, (char*)unscaled, srckeys_width * sizeof *unscaled);
 	free(rgb24data);
 
@@ -785,7 +779,7 @@ static void place_keys_freq(window_node *window){
 	} while (++y < freq_key_image_height);
 	
 
-//	if keysrc.w = srckeys_width, image is scaled when window is wider then image, else image will be black
+	// if keysrc.w = srckeys_width, image is scaled when window is wider then image, else image will be black
 	SDL_Rect keysrc = (SDL_Rect){.x = 0,.y = 0,.w = window->width,.h = freq_key_image_height};
 	SDL_Rect keydst = (SDL_Rect){.x = 0,.y = window->height - freq_key_image_height,.w = window->width,.h = freq_key_image_height};
 
@@ -814,7 +808,7 @@ static void place_keys_logfreq(window_node *window){
 	rgb24_to_rgb32(srckeys_width, logfreq_key_image_height, rgb24data, (char*)to_put_in_rect, texpitch);
 	free(rgb24data);
 
-//	if keysrc.w = srckeys_width, image is scaled when window is wider than image, else image will be black
+	// if keysrc.w = srckeys_width, image is scaled when window is wider than image, else image will be black
 	SDL_Rect keysrc = (SDL_Rect){.x = 0,.y = 0,.w = window->width,.h = logfreq_key_image_height};
 	SDL_Rect keydst = (SDL_Rect){.x = 0,.y = window->height - logfreq_key_image_height,.w = window->width,.h = logfreq_key_image_height};
 
@@ -1007,12 +1001,12 @@ static void make_sine(sample_type *waves_dst, unsigned samples_per_waves, unsign
 	} while (++i < samples_per_waves);
 }
 
-static void make_triangle(sample_type *waves_dst, unsigned samples_per_waves, unsigned wtm){//has sin code
+static void make_triangle(sample_type *waves_dst, unsigned samples_per_waves, unsigned wtm){
 	double waves_to_make = wtm;
 	unsigned i = 0;
 	double trash;
 	do{ // also us an fabs function
-		double val = modf(i*waves_to_make/samples_per_waves, &trash) - 0.5;//repeat from 0 to 1
+		double val = modf(i*waves_to_make/samples_per_waves, &trash) - 0.5; // repeat from 0 to 1
 		double adjusted = 4 * fabs(val) -1;
 		waves_dst[i] = double_to_sample(adjusted); // rounding? Don't go outside range!
 	} while (++i < samples_per_waves);
