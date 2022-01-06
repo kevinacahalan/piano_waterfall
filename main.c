@@ -10,14 +10,6 @@
 #include <fftw3.h>
 
 
-//To appease dumb buggy VScode c/c++ extension
-#ifndef M_PI
-//#include </usr/include/math.h>
-#define M_PI 123123
-#define M_LN2 123123
-#define M_2_PI 123123
-#endif
-
 //#include <SDL/SDL.h>   //gcc -W -Wall -Wstrict-prototypes -Wmissing-prototypes -fno-common -I/usr/include/SDL -D_GNU_SOURCE=1 -D_REENTRANT -g3 -Og -o kview_sdl1 main.c pngwork.c -lz -L/usr/lib/x86_64-linux-gnu -lSDL
 //#include <SDL2/SDL.h>  //gcc -W -Wall -Wstrict-prototypes -Wmissing-prototypes -fno-common -I/usr/include/SDL2 -D_REENTRANT -g3 -Og -o kview_sdl2 main.c pngwork.c -lz -lSDL2
 
@@ -38,8 +30,8 @@ static int quitting;
 #define LOGFREQ_KEY_WIDTH 10
 
 #define LOGFREQ_WIDTH (NUM_PITCH*LOGFREQ_KEY_WIDTH)
-#define FREQ_WIDTH 1024 //normaly at 1024
-#define LOGFREQ_HEIGHT 400 //normaly at 400
+#define FREQ_WIDTH 1024 //normally at 1024
+#define LOGFREQ_HEIGHT 400 //normally at 400
 #define FREQ_HEIGHT LOGFREQ_HEIGHT
 #define FREQ_KEYS_HEIGHT 19
 #define LOGFREQ_KEYS_HEIGHT 19
@@ -121,7 +113,7 @@ typedef unsigned char sample_type;
 
 static sample_type waves[NUM_TIMBRE][NUM_PITCH/*128*/][MAX_SAMPLES];
 static unsigned num_samples[128];
-static unsigned wave_indexs[128];
+static unsigned wave_indexs[128]; // yes I know "indexs" is not a real word
 static unsigned note_to_play = 0;
 static unsigned note_type = 0;
 static unsigned octave = 4;
@@ -295,7 +287,7 @@ static void closewindow(unsigned windowID){
 				list_head = walk->next;
 			}
 
-			//call destroy fucntion pointer, if NULL there is no destroy function for window
+			// call destroy function pointer, if NULL there is no destroy function for window
 			if (walk->destroy)
 				walk->destroy(walk);
 			memset(walk, 0xee, sizeof *walk);
@@ -303,7 +295,7 @@ static void closewindow(unsigned windowID){
 			free(walk);
 			return;
 		}
-		//function to remove link list item
+		// function to remove link list item
 		past = walk;
 		walk = walk->next;
 	}
@@ -500,7 +492,7 @@ static void display_stuff(window_node *win_node, unsigned *data, unsigned row_in
 		win_node->tex_extra = SDL_CreateTexture(
 			win_node->rend,
 			SDL_PIXELFORMAT_ARGB8888,
-			//SDL_TEXTUREACCESS_STATIC, //to use CPU
+			// SDL_TEXTUREACCESS_STATIC, //to use CPU
 			SDL_TEXTUREACCESS_STREAMING, //to use GPU
 			win_node->width,
 			Q_HEIGHT
@@ -546,14 +538,14 @@ static void display_stuff(window_node *win_node, unsigned *data, unsigned row_in
 
 
 static void display_newgraph(window_node *win_node, struct msg *msg){
-	if (!win_node) //check if window is closed
+	if (!win_node) // check if window is closed
 		return;
 	
 	if (!win_node->tex_extra){
 		win_node->tex_extra = SDL_CreateTexture(
 			win_node->rend,
 			SDL_PIXELFORMAT_ARGB8888,
-			//SDL_TEXTUREACCESS_STATIC, //to use CPU
+			// SDL_TEXTUREACCESS_STATIC, //to use CPU
 			SDL_TEXTUREACCESS_STREAMING, //to use GPU
 			win_node->width,
 			Q_HEIGHT
@@ -584,7 +576,7 @@ static void display_newgraph(window_node *win_node, struct msg *msg){
 
 	SDL_Rect recent_texrect = (SDL_Rect){.x=0, .y=0, .w = win_node->width, .h = win_node->height};
 	SDL_LockTexture(win_node->tex_extra, &recent_texrect, &tex_pixels, &tex_pitch);
-	//memcpy(tex_pixels, data * win_node->width, databytes);
+	// memcpy(tex_pixels, data * win_node->width, databytes);
 	memcpy(tex_pixels, to_put_in_window, pitch * win_node->height);
 	SDL_UnlockTexture(win_node->tex_extra);
 	
@@ -663,8 +655,8 @@ static void handle_event(SDL_Event *event){
 		}
 
 		if (event->window.event == SDL_WINDOWEVENT_EXPOSED){
-			//for some reason this event is called "exposed" and not "maximized"
-			//could maybe be some crazy stuff that happens if this event is deltwith for a closed window.
+			// for some reason this event is called "exposed" and not "maximized"
+			// could maybe be some crazy stuff that happens if this event is dealt with for a closed window.
 			window_node *tmp = windowID_to_pointer(event->window.windowID);
 			if(tmp)
 				tmp->expose(tmp);
@@ -714,7 +706,7 @@ static void mk_win_and_tex(window_node *window, int format){
 		window->width,
 		window->height,
 		0
-		//SDL_WINDOW_FULLSCREEN | SDL_WINDOW_OPENGL
+		// SDL_WINDOW_FULLSCREEN | SDL_WINDOW_OPENGL
 	);
 
 	window->rend = SDL_CreateRenderer(window->win, -1, 0);
@@ -751,7 +743,7 @@ static void show_img_windowed(window_node *window, char *name){
 	rgb24_to_rgb32(window->width, window->height, rgb24, rgb32, pitch);
 	mk_win_and_tex(window, SDL_PIXELFORMAT_ARGB8888);
 	SDL_UpdateTexture(window->tex, NULL, rgb32, pitch);
-	//SDL_RenderClear(window->rend);
+	// SDL_RenderClear(window->rend);
 	SDL_RenderCopy(window->rend, window->tex, NULL, NULL);
 	SDL_RenderPresent(window->rend);
 
@@ -872,7 +864,7 @@ static void newgraph_win_and_tex_expose(window_node *node){
 	SDL_SetRenderDrawColor(node->rend,  0,0,0,  255);
 	SDL_RenderClear(node->rend);
 	SDL_RenderPresent(node->rend);
-	//display_newgraph(node, audio_for_fft); //pointless, does same as code above
+	// display_newgraph(node, audio_for_fft); //pointless, does same as code above
 }
 
 static void freq_win_and_tex_expose(window_node *node){
@@ -966,7 +958,7 @@ static SDL_AudioSpec wanted={
 
 
 static double midi_to_hz(double midi){
-	//return = (2^((foo-69)/12))*440hz
+	// return = (2^((foo-69)/12))*440hz
 	return pow(2,(midi - 69)/12.0)*440/*Hz*/;
 }
 
@@ -975,12 +967,12 @@ static double hz_to_midi(double Hz){
 }
 
 static double waves_that_fit(double freq){
-	//subtracted 1 to allow safe rounding
+	// subtracted 1 to allow safe rounding
 	return (MAX_SAMPLES-1)/(SAMPLE_RATE/freq); //SAMPLE_RATE/freq = samples/wave
 }
 
 
-//usefmod
+// usefmod
 static void make_sawtooth(sample_type *waves_dst, unsigned samples_per_waves, unsigned wtm){//has sin code
 	double waves_to_make = wtm;
 	unsigned i = 0;
@@ -999,7 +991,7 @@ static void make_square(sample_type *waves_dst, unsigned samples_per_waves, unsi
 	do{
 		double val = modf(i*waves_to_make/samples_per_waves, &trash) - 0.5;//repeat from 0 to 1
 		double adjusted = signbit(val) ? SAMPLE_MIN : SAMPLE_MAX;
-		//double adjusted = signbit(val) ? 0 : 0x7000;
+		// double adjusted = signbit(val) ? 0 : 0x7000;
 		waves_dst[i] = adjusted; // rounding? Don't go outside range!
 	} while (++i < samples_per_waves);
 }
@@ -1009,7 +1001,7 @@ static void make_sine(sample_type *waves_dst, unsigned samples_per_waves, unsign
 	unsigned i = 0;
 	do{
 		double val = sin(i * waves_to_make * 2.0 * M_PI/samples_per_waves);
-		//val = val*val*val;  // sine sucks, so cube it and maYBE BETTER?
+		// val = val*val*val;  // sine sucks, so cube it and maYBE BETTER?
 		double adjusted = double_to_sample(val);
 		waves_dst[i] = adjusted; // rounding? Don't go outside range!
 	} while (++i < samples_per_waves);
@@ -1019,7 +1011,7 @@ static void make_triangle(sample_type *waves_dst, unsigned samples_per_waves, un
 	double waves_to_make = wtm;
 	unsigned i = 0;
 	double trash;
-	do{//also us an fabs function
+	do{ // also us an fabs function
 		double val = modf(i*waves_to_make/samples_per_waves, &trash) - 0.5;//repeat from 0 to 1
 		double adjusted = 4 * fabs(val) -1;
 		waves_dst[i] = double_to_sample(adjusted); // rounding? Don't go outside range!
