@@ -675,10 +675,10 @@ static void handle_event(SDL_Event *event){
 }
 
 
-static void rgb24_to_rgb32(int png_width, int png_height, char *rgb24, char *rgb32, const unsigned pitch){
+static void rgb24_to_rgb32(int png_width, int png_height, const char *restrict rgb24, char *restrict rgb32, const unsigned pitch){
 	for (int i = 0; i < png_height; i++){
-		unsigned *dst = (unsigned*)rgb32;
-		char *source = rgb24;
+		unsigned *restrict dst = (unsigned*)rgb32;
+		const char *restrict source = rgb24;
 		for (int j = 0; j < png_width && (char *)dst < pitch + rgb32; j++){
 			unsigned char r = *source++;
 			unsigned char g = *source++;
@@ -792,7 +792,7 @@ static void place_keys_freq(window_node *window){
 }
 
 
-//
+// Function to draw that white strip with letters on the bottoms of the logfreq and freq windows
 static void place_keys_logfreq(window_node *window){
 	// 128.h is a png file converted to C array syntex
 	static const unsigned char png_128[] = {
@@ -813,9 +813,9 @@ static void place_keys_logfreq(window_node *window){
 	SDL_Rect keydst = (SDL_Rect){.x = 0,.y = window->height - logfreq_key_image_height,.w = window->width,.h = logfreq_key_image_height};
 
 	if (SDL_UpdateTexture(window->tex, &keysrc, to_put_in_rect, texpitch) == -1)
-		puts("Texture not valid");
+		puts("Texture not valid 56463");
 	if (SDL_RenderCopy(window->rend, window->tex, &keysrc, &keydst))
-		puts("error");
+		puts("error 56463");
 	free(to_put_in_rect);
 }
 
