@@ -338,8 +338,11 @@ static double limiter(double x){
 }
 
 static double dsp_window(double x){
+	// https://en.wikipedia.org/wiki/Window_function#Power-of-sine/cosine_windows
+
 	return cos((x-0.5)*2*M_PI)/2 + 0.5;
 	// return 0.5 + sin(x*M_PI)/2;
+	// return x;
 }
 
 static void compute_spectrum(double *restrict const dst, const sample_type *restrict const src, unsigned n, fftw_plan plan, double *restrict const max_mag){
@@ -648,6 +651,7 @@ static void handle_event(SDL_Event *event){
 			closewindow(event->window.windowID);
 		}
 
+		// OSX seems to love sending this event like crazy
 		if (event->window.event == SDL_WINDOWEVENT_EXPOSED){
 			// for some reason this event is called "exposed" and not "maximized"
 			// could maybe be some crazy stuff that happens if this event is dealt with for a closed window.
@@ -715,7 +719,7 @@ static void mk_win_and_tex(window_node *window, int format){
 }
 
 
-static window_node *spec_and_mk_win_and_tex(window_node *window, char *name, unsigned width, unsigned height, unsigned format){
+static window_node * spec_and_mk_win_and_tex(window_node *window, char *name, unsigned width, unsigned height, unsigned format){
 	window->name = name;
 	window->width = width;
 	window->height = height;
@@ -745,7 +749,7 @@ static void show_img_windowed(window_node *window, char *name){
 	free(rgb24);
 }
 
-
+// Function to draw that white strip with letters on the bottom of the freq window
 static void place_keys_freq(window_node *window){
 	// 128.h is a png file converted to C array syntex
 	static const unsigned char png_128[] = {
@@ -761,21 +765,21 @@ static void place_keys_freq(window_node *window){
 	free(rgb24data);
 
 	const unsigned texpitch = window->width * sizeof (unsigned);
-	unsigned *to_put_in_rect = calloc(texpitch, freq_key_image_height);
+	unsigned *scaled = calloc(texpitch, freq_key_image_height);
 
-
+	// Apply exponential stretch to image of keys
 	unsigned y = 0;
 	do{
-		unsigned x = 0;
+		unsigned dst_x = 0;
 		do{
-			const double midi = hz_to_midi(x*(double)SAMPLE_RATE/8192);
-			unsigned dst_x = midi * LOGFREQ_KEY_WIDTH+(LOGFREQ_KEY_WIDTH/2.0)-0.5;
-			if (dst_x >= srckeys_width)
-				dst_x = srckeys_width - 1;
+			const double midi = hz_to_midi(dst_x*(double)SAMPLE_RATE/8192);
+			unsigned src_x = midi * LOGFREQ_KEY_WIDTH+(LOGFREQ_KEY_WIDTH/2.0)-0.5;
+			if (src_x >= srckeys_width)
+				src_x = srckeys_width - 1;
 			
-			unsigned pixel = *(unscaled + y*srckeys_width + dst_x);
-			*(to_put_in_rect + y*window->width + x) = pixel;
-		} while (++x < window->width);
+			unsigned pixel = *(unscaled + y*srckeys_width + src_x);
+			*(scaled + y*window->width + dst_x) = pixel;
+		} while (++dst_x < window->width);
 	} while (++y < freq_key_image_height);
 	
 
@@ -783,16 +787,16 @@ static void place_keys_freq(window_node *window){
 	SDL_Rect keysrc = (SDL_Rect){.x = 0,.y = 0,.w = window->width,.h = freq_key_image_height};
 	SDL_Rect keydst = (SDL_Rect){.x = 0,.y = window->height - freq_key_image_height,.w = window->width,.h = freq_key_image_height};
 
-	if (SDL_UpdateTexture(window->tex, &keysrc, to_put_in_rect, texpitch) == -1)
+	if (SDL_UpdateTexture(window->tex, &keysrc, scaled, texpitch) == -1)
 		puts("Texture not valid");
 	if (SDL_RenderCopy(window->rend, window->tex, &keysrc, &keydst))
 		puts("error");
 	free(unscaled);
-	free(to_put_in_rect);
+	free(scaled);
 }
 
 
-// Function to draw that white strip with letters on the bottoms of the logfreq and freq windows
+// Function to draw that white strip with letters on the bottom of the logfreq window
 static void place_keys_logfreq(window_node *window){
 	// 128.h is a png file converted to C array syntex
 	static const unsigned char png_128[] = {
@@ -804,19 +808,19 @@ static void place_keys_logfreq(window_node *window){
 	process_png(png_128, sizeof png_128, &srckeys_width, &logfreq_key_image_height,&rgb24data);
 
 	const unsigned texpitch = window->width * sizeof (unsigned);
-	unsigned *to_put_in_rect = calloc(texpitch, logfreq_key_image_height); //maybe should be done in rgb24_to_rgb_32
-	rgb24_to_rgb32(srckeys_width, logfreq_key_image_height, rgb24data, (char*)to_put_in_rect, texpitch);
+	unsigned *scaled = calloc(texpitch, logfreq_key_image_height); //maybe should be done in rgb24_to_rgb_32
+	rgb24_to_rgb32(srckeys_width, logfreq_key_image_height, rgb24data, (char*)scaled, texpitch);
 	free(rgb24data);
 
 	// if keysrc.w = srckeys_width, image is scaled when window is wider than image, else image will be black
 	SDL_Rect keysrc = (SDL_Rect){.x = 0,.y = 0,.w = window->width,.h = logfreq_key_image_height};
 	SDL_Rect keydst = (SDL_Rect){.x = 0,.y = window->height - logfreq_key_image_height,.w = window->width,.h = logfreq_key_image_height};
 
-	if (SDL_UpdateTexture(window->tex, &keysrc, to_put_in_rect, texpitch) == -1)
+	if (SDL_UpdateTexture(window->tex, &keysrc, scaled, texpitch) == -1)
 		puts("Texture not valid 56463");
 	if (SDL_RenderCopy(window->rend, window->tex, &keysrc, &keydst))
 		puts("error 56463");
-	free(to_put_in_rect);
+	free(scaled);
 }
 
 
