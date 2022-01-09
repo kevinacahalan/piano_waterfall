@@ -114,7 +114,6 @@ typedef unsigned char sample_type;
 static sample_type waves[NUM_TIMBRE][NUM_PITCH/*128*/][MAX_SAMPLES];
 static unsigned num_samples[128];
 static unsigned wave_indexs[128]; // yes I know "indexs" is not a real word
-static unsigned note_to_play = 0;
 static unsigned note_type = 0;
 static unsigned octave = 4;
 struct msg{
@@ -186,8 +185,6 @@ static void note_key_up(int key){
 	int m = key_to_midi(key);
 	if (!m)
 		return;
-	note_to_play = 0; //after multi sound support remove this line
-
 	const unsigned bit_index   = 0x1f & m;
 	const unsigned array_index = m >> 5;
 	keybits[array_index] &= ~(1u << bit_index);
@@ -200,8 +197,6 @@ static void note_key_done(int key){
 	int m = key_to_midi(key);
 	if (!m)
 		return;
-	note_to_play = m; // after multi sound support remove this line
-
 	const unsigned bit_index   = 0x1f & m;
 	const unsigned array_index = m >> 5;
 
@@ -211,7 +206,7 @@ static void note_key_done(int key){
 	}
 }
 
-// Check if specific note/midi is playing
+// Check if specific note/midi key is down
 static int is_midi_playing(int m, unsigned *local_keybits){
 	const unsigned bit_index   = 0x1f & m;
 	const unsigned array_index = m >> 5;
@@ -917,9 +912,6 @@ static void audio_callback(void *userdata, Uint8 *stream, int bytes_asked_for){
 		do{
 			if (!is_midi_playing(m, msg->keybits))
 				continue;
-			// OLD CODE:
-			// const unsigned waves_size = num_samples[note_to_play] * sizeof(sample_type);
-			// unsigned where = wave_indexs[note_to_play];
 			const unsigned waves_size = num_samples[m];
 			unsigned where = wave_indexs[m];
 			sum += sample_to_double(waves[note_type][m][where]);
