@@ -909,12 +909,15 @@ static void audio_callback(void *userdata, Uint8 *stream, int bytes_asked_for){
 	do{
 		double sum = 0.0;
 		unsigned m = 0;
+
 		do{
+			double envelop_multiplyer = 1.0;
 			if (!is_midi_playing(m, msg->keybits))
-				continue;
+				envelop_multiplyer = 0; // continue;
+
 			const unsigned waves_size = num_samples[m];
 			unsigned where = wave_indexs[m];
-			sum += sample_to_double(waves[note_type][m][where]);
+			sum += envelop_multiplyer * sample_to_double(waves[note_type][m][where]);
 			if (++where == waves_size)
 				where = 0;
 			wave_indexs[m] = where;
@@ -1018,6 +1021,17 @@ static void generate_all_waves(void){
 		double freq = midi_to_hz(midi);
 		samples_per_wave = SAMPLE_RATE/freq;
 		waves_to_make = waves_that_fit(freq);
+
+		// if wave is too big and does not fit, set thing to silence
+		if(!waves_to_make){
+			num_samples[midi] = 1; // just some random number
+			
+			waves[0][midi][0] = (SAMPLE_MAX+SAMPLE_MIN)/2;
+			waves[1][midi][0] = (SAMPLE_MAX+SAMPLE_MIN)/2;
+			waves[2][midi][0] = (SAMPLE_MAX+SAMPLE_MIN)/2;
+			waves[3][midi][0] = (SAMPLE_MAX+SAMPLE_MIN)/2;
+			continue;
+		}
 		samples_per_waves = round(waves_to_make * samples_per_wave);
 		num_samples[midi] = samples_per_waves;
 
